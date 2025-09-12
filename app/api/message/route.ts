@@ -9,19 +9,33 @@ export async function POST(req: NextRequest) {
   if (!text) return new Response("Bad Request", { status: 400 });
 
   const encoder = new TextEncoder();
+
   const stream = new ReadableStream({
     start(controller) {
+      console.log("stream:start");
+
       createAssistantResponseStream(text, {
-        onDelta: (delta) => controller.enqueue(encoder.encode(delta)),
-        onDone: () => controller.close(),
+        onDelta: (delta) => {
+          // newline helps some clients flush
+          controller.enqueue(encoder.encode(delta + "\n"));
+          console.log("stream:delta", delta.length);
+        },
+        onDone: () => {
+          console.log("stream:done");
+          controller.close();
+        },
       });
+    },
+    cancel() {
+      console.log("stream:cancel");
     },
   });
 
   return new Response(stream, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
+      "Transfer-Encoding": "chunked",
     },
   });
 }

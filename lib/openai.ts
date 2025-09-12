@@ -4,7 +4,11 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY as string;
 type StreamHandlers = { onDelta: (chunk: string) => void; onDone: () => void };
 
 export async function createAssistantResponseStream(userText: string, h: StreamHandlers) {
-  if (!OPENAI_API_KEY) { console.error("OPENAI_API_KEY missing"); h.onDone(); return; }
+  if (!OPENAI_API_KEY) {
+    console.error("OPENAI_API_KEY missing");
+    h.onDone();
+    return;
+  }
 
   const body = {
     model: "gpt-4o-mini-2024-07-18",
@@ -39,7 +43,7 @@ export async function createAssistantResponseStream(userText: string, h: StreamH
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = ""; // <-- accumulate partial lines
+  let buffer = "";
 
   try {
     for (;;) {
@@ -47,13 +51,12 @@ export async function createAssistantResponseStream(userText: string, h: StreamH
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
 
-      // Process complete lines; keep remainder in buffer
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
 
       for (const line of lines) {
         const s = line.trim();
-        if (!s || s.startsWith(":")) continue;        // ignore keepalive/comments
+        if (!s || s.startsWith(":")) continue;
         if (!s.startsWith("data:")) continue;
 
         const payload = s.slice(5).trim();
@@ -64,9 +67,11 @@ export async function createAssistantResponseStream(userText: string, h: StreamH
           const delta =
             obj?.output?.[0]?.content?.[0]?.text?.value ??
             obj?.output_text ?? "";
-          if (delta) h.onDelta(delta);
+          if (delta) {
+            console.log("delta", delta.length, delta.slice(0, 80)); // <-- log length + snippet
+            h.onDelta(delta);
+          }
         } catch (e) {
-          // Incomplete JSON should no longer occur; log if it does
           console.error("parse error", (e as Error).message, payload.slice(0, 200));
         }
       }
