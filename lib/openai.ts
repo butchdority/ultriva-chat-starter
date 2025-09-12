@@ -1,24 +1,13 @@
 // lib/openai.ts
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY as string;
 
-type StreamHandlers = {
-  onDelta: (chunk: string) => void;
-  onDone: () => void;
-};
+type StreamHandlers = { onDelta: (chunk: string) => void; onDone: () => void };
 
-export async function createAssistantResponseStream(
-  userText: string,
-  h: StreamHandlers
-) {
-  if (!OPENAI_API_KEY) {
-    console.error("OPENAI_API_KEY missing");
-    h.onDone();
-    return;
-  }
+export async function createAssistantResponseStream(userText: string, h: StreamHandlers) {
+  if (!OPENAI_API_KEY) { console.error("OPENAI_API_KEY missing"); h.onDone(); return; }
 
-  // Request body
   const body = {
-    model: "gpt-4o-mini",
+    model: "gpt-4o-mini-2024-07-18",
     input: [
       { role: "system", content: "You are an Ultriva product assistant. Answer concisely." },
       { role: "user", content: userText }
@@ -26,7 +15,6 @@ export async function createAssistantResponseStream(
     stream: true
   };
 
-  // 30s timeout guard
   const ac = new AbortController();
   const timeout = setTimeout(() => ac.abort(), 30_000);
 
@@ -34,70 +22,52 @@ export async function createAssistantResponseStream(
 
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
+    headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
     signal: ac.signal
-  }).catch((err) => {
-    console.error("fetch error", err);
-    return undefined;
-  });
+  }).catch(err => { console.error("fetch error", err); return undefined; });
 
   clearTimeout(timeout);
 
-  if (!res) {
-    console.error("no response object");
-    h.onDone();
-    return;
-  }
-
+  if (!res || !res.body) { console.error("no response/body from OpenAI"); h.onDone(); return; }
   console.log("OpenAI response status", res.status);
-
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     console.error("OpenAI error", res.status, text);
-    h.onDelta(`Error ${res.status}: ${text || "request failed"}`);
-    h.onDone();
-    return;
+    h.onDelta(`Error ${res.status}: ${text || "request failed"}`); h.onDone(); return;
   }
 
-  if (!res.body) {
-    console.error("response has no body");
-    h.onDone();
-    return;
-  }
-
-  // Parse SSE stream
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
+  let buffer = ""; // <-- accumulate partial lines
 
   try {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, { stream: true });
 
-      for (const line of chunk.split("\n")) {
+      // Process complete lines; keep remainder in buffer
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
         const s = line.trim();
+        if (!s || s.startsWith(":")) continue;        // ignore keepalive/comments
         if (!s.startsWith("data:")) continue;
 
         const payload = s.slice(5).trim();
-        if (payload === "[DONE]") {
-          h.onDone();
-          return;
-        }
+        if (payload === "[DONE]") { h.onDone(); return; }
 
         try {
           const obj = JSON.parse(payload);
           const delta =
             obj?.output?.[0]?.content?.[0]?.text?.value ??
-            obj?.output_text ??
-            "";
+            obj?.output_text ?? "";
           if (delta) h.onDelta(delta);
         } catch (e) {
-          console.error("parse error", e, payload);
+          // Incomplete JSON should no longer occur; log if it does
+          console.error("parse error", (e as Error).message, payload.slice(0, 200));
         }
       }
     }
