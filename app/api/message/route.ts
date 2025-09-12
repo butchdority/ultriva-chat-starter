@@ -4,29 +4,34 @@ export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { createAssistantResponseStream } from "../../../lib/openai";
 
-async function getTextFromRequest(req: NextRequest): Promise<string | undefined> {
+// Read 'text' safely from JSON or urlencoded, without double-reading the body
+async function getText(req: NextRequest): Promise<string | undefined> {
   const ct = req.headers.get("content-type") || "";
-  try {
-    if (ct.includes("application/json")) {
-      const j = await req.json();
-      return j?.text;
-    }
-  } catch { /* fall through */ }
 
+  // If JSON, try parsing on a clone so we can still fallback if it fails
+  if (ct.includes("application/json")) {
+    try {
+      const j = await req.clone().json();
+      if (j?.text) return j.text as string;
+    } catch { /* fall through to raw text */ }
+  }
+
+  // Read raw text once from the original request
   const raw = await req.text();
-  // try JSON anyway
+
+  // Try JSON-from-text
   try {
     const j = JSON.parse(raw);
-    if (j?.text) return j.text;
-  } catch { /* fall through */ }
+    if (j?.text) return j.text as string;
+  } catch { /* ignore */ }
 
-  // try form/urlencoded: "text=..."
+  // Try form urlencoded: "text=..."
   const p = new URLSearchParams(raw);
   return p.get("text") ?? undefined;
 }
 
 export async function POST(req: NextRequest) {
-  const text = await getTextFromRequest(req);
+  const text = await getText(req);
   if (!text) return new Response("Bad Request", { status: 400 });
 
   const encoder = new TextEncoder();
