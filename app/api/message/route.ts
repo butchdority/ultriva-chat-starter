@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 import { NextRequest } from 'next/server'
 import { createAssistantResponseStream } from '../../../lib/openai'
 
-export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
   const { text } = await req.json()

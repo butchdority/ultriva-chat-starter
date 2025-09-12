@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 import { NextRequest } from 'next/server'
 import { getEventStream } from '../../../lib/stream'
 
-export const runtime = 'nodejs'
 
 export async function GET(_req: NextRequest) {
   const { readable, push, close } = getEventStream()
