@@ -19,3 +19,4 @@ Use it to let others interact with your Ultriva project securely via a browser.
 ## Notes
 - This is a starter. Replace verification logic and add persistence as needed.
 - If you want per-user threads, persist `thread_id` in your DB keyed by your user id.
+-Had to add the env vars again
