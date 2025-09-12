@@ -10,11 +10,9 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
-  // autoscroll on new content
   useEffect(() => {
     const el = boxRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   async function send() {
@@ -23,10 +21,7 @@ export default function Page() {
 
     setInput('');
     setLoading(true);
-    setMessages((prev) => prev.concat(
-      { role: 'user', content: text },
-      { role: 'assistant', content: '' },
-    ));
+    setMessages(prev => prev.concat({ role: 'user', content: text }, { role: 'assistant', content: '' }));
 
     try {
       const res = await fetch('/api/message', {
@@ -37,7 +32,7 @@ export default function Page() {
       });
 
       if (!res.ok || !res.body) {
-        setMessages((prev) => {
+        setMessages(prev => {
           const next = prev.slice();
           next[next.length - 1] = { role: 'assistant', content: `Error ${res.status}` };
           return next;
@@ -48,22 +43,21 @@ export default function Page() {
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let acc = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        acc += decoder.decode(value, { stream: true });
+        const chunk = decoder.decode(value, { stream: true });
 
-        setMessages((prev) => {
+        setMessages(prev => {
           const next = prev.slice();
-          const last = next[next.length - 1];
-          next[next.length - 1] = { role: 'assistant', content: (last?.content ?? '') + acc.slice((last?.content ?? '').length) };
+          const last = next[next.length - 1]?.content ?? '';
+          next[next.length - 1] = { role: 'assistant', content: last + chunk };
           return next;
         });
       }
-    } catch (e: any) {
-      setMessages((prev) => {
+    } catch (e:any) {
+      setMessages(prev => {
         const next = prev.slice();
         next[next.length - 1] = { role: 'assistant', content: `Network error: ${e?.message || e}` };
         return next;
@@ -76,18 +70,9 @@ export default function Page() {
   return (
     <main style={{ maxWidth: 760, margin: '40px auto', padding: 16 }}>
       <h1>Ultriva Project Chat</h1>
-
       <div
         ref={boxRef}
-        style={{
-          border: '1px solid #ddd',
-          borderRadius: 8,
-          padding: 16,
-          minHeight: 320,
-          maxHeight: 520,
-          overflowY: 'auto',
-          background: '#fff',
-        }}
+        style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, minHeight: 320, maxHeight: 520, overflowY: 'auto' }}
       >
         {messages.map((m, i) => (
           <div key={i} style={{ whiteSpace: 'pre-wrap', margin: '8px 0' }}>
@@ -96,21 +81,16 @@ export default function Page() {
         ))}
         {messages.length === 0 && <div style={{ color: '#888' }}>Ask a question to begin.</div>}
       </div>
-
       <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
         <input
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') send(); }}
           placeholder="Type a message"
           disabled={loading}
           style={{ flex: 1, padding: 10, border: '1px solid #ccc', borderRadius: 6 }}
         />
-        <button
-          onClick={send}
-          disabled={loading}
-          style={{ padding: '10px 16px', borderRadius: 6, border: '1px solid #333' }}
-        >
+        <button onClick={send} disabled={loading} style={{ padding: '10px 16px', borderRadius: 6, border: '1px solid #333' }}>
           {loading ? 'Sending' : 'Send'}
         </button>
       </div>
