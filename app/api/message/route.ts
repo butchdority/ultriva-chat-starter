@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
 
       createAssistantResponseStream(text, {
         onDelta: (delta) => {
-          controller.enqueue(encoder.encode(delta + "\n")); // flush-friendly
+          controller.enqueue(encoder.encode(d));  // no newline per token
           console.log("stream:delta", delta.length);
         },
         onDone: () => {
