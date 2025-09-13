@@ -127,7 +127,7 @@ export default function Page() {
       </header>
 
       {errorMsg && (
-        <div role="alert" aria-live="assertive" style={alert()}>
+        <div role="alert" aria-live="assertive" style={alertBox()}>
           <span>{errorMsg}</span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={retry} style={btn('primary')}>Retry</button>
@@ -190,4 +190,17 @@ function btn(kind: 'primary' | 'ghost', disabled = false): React.CSSProperties {
     return { padding: '10px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', minHeight: 44 };
   }
   return { padding: '10px 16px', borderRadius: 8, border: '1px solid #111827', background: disabled ? '#9ca3af' : '#111827', color: '#fff', cursor: disabled ? 'not-allowed' : 'pointer', minHeight: 44 };
+}
+function alertBox(): React.CSSProperties {
+  return {
+    background: '#fff4f4',
+    border: '1px solid #f0c2c2',
+    color: '#7a1d1d',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 8,
+  };
 }
